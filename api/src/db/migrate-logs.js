@@ -4,10 +4,11 @@
 // det här är samma dokument, för alla turer, plus en kontroll av att inget tappades på vägen.
 //
 // Kör:  npm run migrate:logs   (Postgres seedad, Mongo igång). Går att köra om: replaceOne + upsert.
+import { pathToFileURL } from 'node:url';
 import { pool } from './client.js';
 import { mongo, toursCollection } from './mongo.js';
 
-const run = async () => {
+export const migrateLogs = async () => {
   const t0 = Date.now();
   const tours = (await pool.query('select * from tours order by id')).rows;
   const logs = (await pool.query('select * from tour_logs order by tour_id, recorded_at')).rows;
@@ -66,11 +67,16 @@ const run = async () => {
     throw new Error('Migreringen stämmer inte – antalet dokument eller mätpunkter avviker');
   }
   console.log('Verifierat: inget tappades på vägen.');
-  await mongo.close();
-  await pool.end();
 };
 
-run().catch((err) => {
-  console.error(err.message);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  migrateLogs()
+    .then(async () => {
+      await mongo.close();
+      await pool.end();
+    })
+    .catch((err) => {
+      console.error(err.message);
+      process.exit(1);
+    });
+}

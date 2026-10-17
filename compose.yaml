@@ -41,6 +41,8 @@ services:
       # Portarna är containrarnas egna (5432), inte de publicerade (5433).
       DATABASE_URL: postgres://utpost:utpost@postgres:5432/utpost
       MONGO_URL: mongodb://utpost:utpost@mongo:27017/utpost?authSource=admin
+      JWT_SECRET: utpost-dev-secret-byt-i-molnet # M6: lokalt värde. I molnet: en secret i plattformen, aldrig i en fil som committas
+      SEED_ON_START: '1' # M6: tom databas vid start → seed + migrate:logs. Lokalt: harmlöst, seedar bara om users är tom
     # Inga ports: browsern når API:et genom nginx i client (/api och /graphql skickas vidare
     # till api:4000 inne i nätverket). Felsöka API:et direkt? Lägg tillbaka  ports: - "4000:4000"
     depends_on:
@@ -53,6 +55,8 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
+    environment:
+      API_UPSTREAM: api:4000 # M6: vart nginx skickar /api och /graphql. I Azure (sidecars i samma app): localhost:4000
     ports:
       - "3001:80" # nginx lyssnar på 80 i containern
     depends_on:

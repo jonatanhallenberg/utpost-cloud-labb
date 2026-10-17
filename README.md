@@ -37,6 +37,7 @@ npm run dev:client                    # Vue-klienten på :3001 med hot reload, /
 - `client/` – ny klient i Vue 3 + TypeScript (port 3001). GraphQL med urql (`src/urql.ts`, cache i klienten) och typer genererade ur schemat (`codegen.ts` → `src/gql/`, M5). `client/Dockerfile` är multi-stage: Node bygger, nginx serverar (`client/nginx.conf`).
 - `shared/` – API-kontraktet som TypeScript-typer (`@utpost/shared`), används av `api/` och `client/`.
 - `web/` – den gamla React-klienten. Portas vy för vy till `client/`, tas bort i M6.
+- `infra/azure/` – staging i Azure Container Apps (M6): `staging.yaml` beskriver appen (client + api + postgres + mongo som sidecars), `skapa-staging.sh` skapar den en gång. Pipelinen byter sedan bara image.
 - `compose.yaml` – hela miljön. `docs/decisions/` – teamets beslutsdokument.
 
 ## Kommandon (kör från roten)
@@ -51,6 +52,16 @@ npm run dev:client                    # Vue-klienten på :3001 med hot reload, /
     npm run build             # vite build av client/
     npm run mongo:smoke [id]  # skriver en tur ur Postgres som ett dokument i MongoDB och läser tillbaka
     npm run migrate:logs      # alla turer med mätpunkter → MongoDB, med kontroll av antalet (M5)
+
+## Konfiguration och hemligheter (M6)
+
+Allt som skiljer en miljö från en annan kommer från miljövariabler – se `.env.example`. Koden har standardvärden för lokal utveckling, compose sätter sina, och i molnet sätts de i plattformen. Hemligheter (`JWT_SECRET`, databasadresserna med lösenord) ligger i plattformens *secrets* och refereras från variablerna – de finns inte i någon fil som committas. `client`-imagen läser `API_UPSTREAM` när den startar (nginx-mallen `client/nginx.conf.template`), så samma image fungerar i compose (`api:4000`) och i Azure (`localhost:4000`).
+
+`/api/health` svarar med `sha` – commiten imagen byggdes från (`GIT_SHA`, satt av pipelinen). Så vet man vilken version som kör, och det är så deploysteget vet att molnet har bytt.
+
+## I molnet (M6)
+
+Staging kör i **Azure Container Apps** som en app med fyra containrar (`infra/azure/staging.yaml`). Skapa den en gång med `infra/azure/skapa-staging.sh`; därefter deployar pipelinen vid varje merge till `main` (jobbet *Deploy → Azure staging*, se `docs/pipeline.md`). Appen skalar till noll mellan passen: första anropet väcker den (räkna med en minut), och databaserna seedas om vid varje kallstart (`SEED_ON_START=1`). Beslutet och alternativen står i `docs/decisions/hosting.md`.
 
 ## Images
 
